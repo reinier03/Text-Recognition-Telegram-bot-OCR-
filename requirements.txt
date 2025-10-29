@@ -1,6 +1,6 @@
-easyocr
+easyocr==1.7.0
 Flask
-numpy
+numpy==1.24.3
 Pillow
 pyTelegramBotAPI
 requests
