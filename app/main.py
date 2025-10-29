@@ -37,6 +37,7 @@ reader = easyocr.Reader(['ja', 'en'], gpu=False)
 # Inicializar bot de Telegram
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, "html", disable_web_page_preview=True)
 
+bot.send_message(admin, "El bot de reconocimiento de texto está online :D")
 
 
 # Inicializar el bot
