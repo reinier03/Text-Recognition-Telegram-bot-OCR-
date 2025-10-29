@@ -39,7 +39,7 @@ COPY ./app /app/
 COPY requirements.txt /app/requirements.txt
 
 # Si tienes un requirements.txt, instálalo
-RUN pip install -r ./app/requirements.txt
+RUN pip install -r requirements.txt
 
 # Exponer puerto si es necesario (para webhooks)
 EXPOSE 5900
