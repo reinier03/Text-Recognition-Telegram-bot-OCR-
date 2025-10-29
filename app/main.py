@@ -32,7 +32,7 @@ logging.basicConfig(
 )
 
 # Inicializar EasyOCR para japonés e inglés
-reader = easyocr.Reader(['ja', 'en'], gpu=False)
+reader = easyocr.Reader(['ja', 'en'], gpu=True)
 
 # Inicializar bot de Telegram
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, "html", disable_web_page_preview=True)
