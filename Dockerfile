@@ -44,7 +44,7 @@ RUN pip install -r requirements.txt
 # Exponer puerto si es necesario (para webhooks)
 EXPOSE 5900
 
-RUN python3 -c "import easyocr; easyocr.Reader(['ja', 'en'], gpu=False)"
+RUN python3 -c "import easyocr; easyocr.Reader(['ja', 'en'], gpu=True)"
 
 # Comando para ejecutar el bot
 CMD ["python3", "main.py"]
