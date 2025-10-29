@@ -3,7 +3,7 @@ import imaplib
 import email
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.image import MimeImage
+from email.mime.image import MIMEImage
 from email.mime.application import MIMEApplication
 from email.message import Message
 import numpy as np
