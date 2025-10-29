@@ -1,0 +1,7 @@
+Pillow
+easyocr
+numpy
+flask
+requests
+Flask
+python-telegram-bot
