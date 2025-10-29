@@ -23,7 +23,7 @@ import requests
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('ocr_bot.log'),
@@ -165,7 +165,7 @@ app = Flask(__name__)
 
 @app.route("/", methods=['POST', 'GET'])
 def webhook():
-    global scrapper
+
     
     if request.method.lower() == "post":   
         
@@ -174,7 +174,7 @@ def webhook():
             json_string = request.get_data().decode('utf-8')
             update = telebot.types.Update.de_json(json_string)
             try:
-                if "host" in update.message.text and update.message.chat.id in [admin, scrapper.creador]:
+                if "host" in update.message.text and update.message.chat.id == admin:
                     bot.send_message(update.message.chat.id, "El url del host es: <code>{}</code>".format(request.url))
                     
                     #en los host gratuitos, cuando pasa un tiempo de inactividad el servicio muere, entonces hago este GET a la url para que no muera  
@@ -208,10 +208,6 @@ def flask():
     if os.getenv("webhook_url"):
         bot.remove_webhook()
         time.sleep(2)
-        if os.environ.get("admin"):
-            if int(os.environ.get("admin")) == scrapper.creador and not scrapper.interrupcion:
-                bot.send_message(int(os.environ.get("admin")), "El bot de publicaciones de Facebook está listo :)\n\nEstoy usando el método webhook")
-                
         bot.set_webhook(url=os.environ["webhook_url"])
     
     app.run(host="0.0.0.0", port=5000)
@@ -228,7 +224,7 @@ if not os.getenv("webhook_url"):
     bot.remove_webhook()
     time.sleep(2)
     if os.environ.get("admin"):
-        bot.send_message(int(os.environ.get("admin")), "El bot de publicaciones de Facebook está listo :)\n\nEstoy usando el método polling")
+        bot.send_message(admin, "El bot de publicaciones de Facebook está listo :)\n\nEstoy usando el método polling")
     
     try:
         bot.infinity_polling(timeout=80,)
