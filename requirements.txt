@@ -1,6 +1,8 @@
-easyocr==1.7.0
-Flask
-numpy==1.24.3
-Pillow
-pyTelegramBotAPI
-requests
+beautifulsoup4==4.14.2
+DeeperSeek==0.1.4
+Flask==3.1.2
+inscriptis==2.6.0
+pyTelegramBotAPI==4.29.1
+PyVirtualDisplay==3.0
+requests==2.32.5
+zendriver==0.14.2
