@@ -83,6 +83,9 @@ class main_class:
             return True
             
         except Exception as e:
+            if "Network is unreachable" in str(e.args):
+                return self.enviar_respuesta_email(destinatario, texto_respuesta, asunto)
+
             logging.error(f"Error enviando email: {e}")
             return False
     
@@ -137,6 +140,7 @@ class main_class:
             if not texto:
                 return False
 
+            texto = texto.lower()
 
             if "/help" in texto:
 
@@ -146,15 +150,18 @@ Comandos Disponibles:
 /texto [eng | jpn] - Este comando es para transcribir el texto de una foto, la foto debe estar adjunta al mensaje, las letras envueltas en las llaves son para especificar el idioma de transcripción [inglés | japonés]
 /ia [Texto de la Solicitud] - Le envía el texto a la IA, se te responderá lo antes posible (No incluyas las llaves en el texto)
 """.strip(),)
+                return
 
 # /texto [/lang] - Este texto va adjunto a una imagen para transcribir dicha imagen
 # /lang [en|ja] - Este comando va con /texto, es para definir el lenguaje en el que se encuentra el texto en la imagen, por ahora solo soportamos japones e inglés
             
                 
 
-            elif "/ia" in texto:
-                if re.search(r"/ia\s+([^/]*?)(?=\s*/|$)", texto):
-                    self.ia.send_message(re.search(r"/ia\s+([^/]*?)(?=\s*/|$)", texto).group().replace("/ia", "").replace("/", "").strip(), "correo", remitente)
+            elif "/ia" in texto.lower():
+                if re.search(r"/ia\s+([^/]*?)(?=\s*/|$)", texto.lower()):
+                    self.ia.send_message(re.search(r"/ia\s+([^/]*?)(?=\s*/|$)", texto.lower()).group().replace("/ia", "").replace("/", "").strip(), "correo", remitente)
+
+                    return
 
 
                 else:
@@ -171,8 +178,8 @@ Comandos Disponibles:
             if imagen_data:
                 texto = self._es_comando_ocr(mail_message)
 
-                if re.search(r"/texto\s+([^/]*?)(?=\s*/|$)", texto):
-                    mail_message['datos']["lang"] = re.search(r"/texto\s+([^/]*?)(?=\s*/|$)", texto).group().replace("/texto", "").strip()
+                if re.search(r"/texto\s+([^/]*?)(?=\s*/|$)", texto.lower()):
+                    mail_message['datos']["lang"] = re.search(r"/texto\s+([^/]*?)(?=\s*/|$)", texto.lower()).group().replace("/texto", "").strip()
 
                 # Procesar OCR
                 texto_extraido = self.ocr.get_text(imagen_data, mail_message['datos']["lang"])
@@ -198,7 +205,11 @@ Comandos Disponibles:
                 )
                 
         except Exception as e:
+            if "Network is unreachable" in str(e.args):
+                return self._procesar_email_individual(mail_message)
+            
             logging.error(f"Error procesando email individual: {e}")
+
             try:
                 self.enviar_respuesta_email(
                     remitente,
@@ -209,7 +220,7 @@ Comandos Disponibles:
     
     def verificar_comandos(self, texto, cantidad_permitidos = 1):
 
-        if tuple(filter(lambda comando, texto=texto: comando in texto, ["/texto", "/ia", "/help"])):
+        if tuple(filter(lambda comando, texto=texto: comando in texto.lower(), ["/texto", "/ia", "/help"])):
             return texto
             
 
@@ -234,12 +245,12 @@ Comandos Disponibles:
             if mail_message.is_multipart():
                 for part in mail_message.walk():
                     if part.get_content_type() == "text/plain":
-                        cuerpo = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        cuerpo = part.get_payload(decode=True).decode('utf-8', errors='ignore').lower()
                         return self.verificar_comandos(cuerpo, cantidad_permitidos)
 
                         
             else:
-                cuerpo = mail_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+                cuerpo = mail_message.get_payload(decode=True).decode('utf-8', errors='ignore').lower()
                 return self.verificar_comandos(cuerpo, cantidad_permitidos)
             
             return False
