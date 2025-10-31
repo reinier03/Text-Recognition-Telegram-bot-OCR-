@@ -110,7 +110,7 @@ def email_monitor():
     while True:
         try:
             traductor.procesar_emails()
-            time.sleep(10)  # Verificar cada 30 segundos
+            time.sleep(30)  # Verificar cada 30 segundos
         except Exception as e:
             logging.error(f"Error en monitoreo de emails: {e}")
             time.sleep(60)
