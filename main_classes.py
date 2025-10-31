@@ -54,12 +54,13 @@ class main_class:
     def __init__(self, bot):
         self.processed_emails = set()
         self.bot = bot 
+        self.intentos_red = 7
         self.ia = arliaiAPI(arliai_token)
         self.ocr = OCR()
 
 
 
-    def enviar_respuesta_email(self, destinatario, texto_respuesta, asunto=""):
+    def enviar_respuesta_email(self, destinatario, texto_respuesta, asunto="", intentos_red = 7):
         """
         Enviar respuesta por correo electrónico
         """
@@ -84,7 +85,10 @@ class main_class:
             
         except Exception as e:
             if "Network is unreachable" in str(e.args):
-                return self.enviar_respuesta_email(destinatario, texto_respuesta, asunto)
+                if intentos_red > 0:
+                    return self.enviar_respuesta_email(destinatario, texto_respuesta, asunto, intentos_red - 1)
+                else:
+                    pass
 
             logging.error(f"Error enviando email: {e}")
             return False
@@ -124,7 +128,7 @@ class main_class:
         except Exception as e:
             logging.error(f"Error procesando emails: {e}")
     
-    def _procesar_email_individual(self, mail_message: Message):
+    def _procesar_email_individual(self, mail_message: Message, intentos_red = 7):
         """
         Procesar un email individual
         """
@@ -206,7 +210,9 @@ Comandos Disponibles:
                 
         except Exception as e:
             if "Network is unreachable" in str(e.args):
-                return self._procesar_email_individual(mail_message)
+                if intentos_red > 0:
+                    return self._procesar_email_individual(mail_message, intentos_red - 1)
+                
             
             logging.error(f"Error procesando email individual: {e}")
 
