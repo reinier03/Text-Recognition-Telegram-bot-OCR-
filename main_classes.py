@@ -84,11 +84,9 @@ class main_class:
             return True
             
         except Exception as e:
-            if "Network is unreachable" in str(e.args):
-                if intentos_red > 0:
-                    return self.enviar_respuesta_email(destinatario, texto_respuesta, asunto, intentos_red - 1)
-                else:
-                    pass
+            # if "Network is unreachable" in str(e.args):
+            #     if intentos_red > 0:
+            #         return self.enviar_respuesta_email(destinatario, texto_respuesta, asunto, intentos_red - 1)
 
             logging.error(f"Error enviando email: {e}")
             return False
@@ -209,9 +207,9 @@ Comandos Disponibles:
                 )
                 
         except Exception as e:
-            if "Network is unreachable" in str(e.args):
-                if intentos_red > 0:
-                    return self._procesar_email_individual(mail_message, intentos_red - 1)
+            # if "Network is unreachable" in str(e.args):
+            #     if intentos_red > 0:
+            #         return self._procesar_email_individual(mail_message, intentos_red - 1)
                 
             
             logging.error(f"Error procesando email individual: {e}")
