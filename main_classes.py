@@ -76,6 +76,7 @@ class arliaiAPI():
         # Gemma-3-27B-it
         # Gemma-3-27B-ArliAI-RPMax-v3
 
+        breakpoint()
         playload = json.dumps({
         "model": "Gemma-3-27B-it",
         "messages": 
@@ -95,7 +96,11 @@ class arliaiAPI():
         if clase_enviar and destinatario:
             if isinstance(clase_enviar, telebot.TeleBot):
                 if res.status_code == 200:
-                    clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")[:4000], parse_mode='Markdown')
+                    try:
+                        clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")[:4000], parse_mode='Markdown')
+
+                    except:
+                        clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")[:4000], parse_mode=False)
 
                 else:
                     clase_enviar.send_message(destinatario, "Ha Ocurrido un Error :(\n\nDescripción del error:\n" + res.reason)

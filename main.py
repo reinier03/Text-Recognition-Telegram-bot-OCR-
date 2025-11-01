@@ -26,6 +26,24 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="html", disable_web_page_pr
 
 traductor = main_class(bot)
 
+
+@bot.message_handler(commands=["contexto"])
+def set_contexto(m):
+    msg = bot.send_message(m.chat.id, "Ahora envía el nuevo mensaje de contexto para la IA", reply_markup=telebot.types.ReplyKeyboardMarkup(True, True).add("Eliminar Contexto / Cancelar Operación"))
+
+    bot.register_next_step_handler(msg, get_contexto)
+
+
+def get_contexto(m):
+    if m.text == "Eliminar Contexto / Cancelar Operación":
+        traductor.ia.mensajes_de_contexto.clear()
+        bot.send_message(m.chat.id, "Muy bien, el mensaje de contexto ha sido eliminado y la operación ha sido cancelada", reply_markup=telebot.types.ReplyKeyboardRemove())
+        return
+
+    traductor.ia.mensajes_de_contexto = [{"role": "user", "content": m.text}]
+    bot.send_message(m.chat.id, "Muy bien, a partir de ahora el mensaje de contexto es:\n\n" + m.text, reply_markup=telebot.types.ReplyKeyboardRemove())
+
+
 # Handlers de Telegram
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -35,6 +53,7 @@ def send_welcome(message):
 *Comandos disponibles:*
 /start - Mostrar este mensaje
 /help - Ayuda
+/contexto - para darle contexto a la IA
 /ia [Texto] - Le envía un texto a la IA para que te responda
 
 Envíame una captura de un texto en algún idioma y te lo transcribiré / traduciré al español
