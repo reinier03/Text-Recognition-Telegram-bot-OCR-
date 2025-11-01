@@ -35,7 +35,7 @@ try:
     print("La dirección del servidor es:{}".format(request.host_url))
     
 except:
-    if "serve" in sys.argv:
+    if "serve" in sys.argv and os.environ.get("webhook_url"):
         threading.Thread(name="hilo_flask", target=flask).start()
 
 
