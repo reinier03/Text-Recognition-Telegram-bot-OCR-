@@ -1,21 +1,201 @@
 import os
 from config import *
-import subprocess as s
+from main_classes import *
+import telebot
+import threading
+import time
+import os
+import logging
+from flask import Flask, request
+import requests
 
-delay = (os.environ["delay"] if os.environ.get("delay") else 10)
 
-def comando(cmd):
-    return s.run(cmd, stderr=s.PIPE, stdout=s.PIPE, shell=True, universal_newlines=True).stdout
 
-if os.name == "nt":
-    python_str = "python"
+# Configurar logging
+logging.basicConfig(
+    # level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('ocr_bot.log'),
+        logging.StreamHandler(),
+    ],
+)
 
-else:
-    python_str = "python3"
+# Inicializar bot de Telegram
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="html", disable_web_page_preview=True)
 
-if not EMAIL in comando('{} email_main.py list'.format(python_str)):
-    os.system('{} email_main.py init {} "{}"'.format(python_str, EMAIL, EMAIL_PASSWORD))  
+traductor = main_class(bot)
 
-os.system('{} email_main.py config scan_all_folders_debounce_secs {}'.format(python_str, delay)) 
+# Handlers de Telegram
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    welcome_text = """
+🤖 *Bot de Reconocimiento de Texto OCR*
 
-os.system('{} email_main.py serve'.format(python_str))
+*Comandos disponibles:*
+/start - Mostrar este mensaje
+/help - Ayuda
+/ia [Texto] - Le envía un texto a la IA para que te responda
+
+Envíame una captura de un texto en algún idioma y te lo transcribiré / traduciré al español
+Para especificar el idioma de las letras en la captura envia el texto adjunto a la foto:
+*/texto jpn* para el japonés
+*/texto eng* para el inglés
+
+*Idiomas soportados:* 🇯🇵 Japonés | 🇺🇸 Inglés
+
+*También puedes usar por email:*
+Envía un email a {} con:
+- Asunto o cuerpo que contenga "/ia [TEXTO]"
+
+*Desarrollado con EasyOCR*
+    """.format(EMAIL)
+    
+    bot.reply_to(message, welcome_text, parse_mode='Markdown')
+
+
+
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message: telebot.types.Message):
+
+    try:
+        # Informar que se está procesando
+        processing_msg = bot.reply_to(message, "🔄 Procesando imagen...")
+        
+        # Obtener la foto en la mejor calidad
+
+        temp_dict = {message.from_user.id: {"lang": "jpn"}}
+
+        if message.caption:
+            if re.search(r"/texto\s+([^/]*?)(?=\s*/|$)", message.caption.lower()):
+                temp_dict[message.from_user.id]["lang"] = re.search(r"/texto \w+", message.caption.lower()).group().replace("/texto", "").strip()
+
+        # Procesar la imagen
+        texto_extraido = traductor.ocr.get_text(bot.download_file(bot.get_file(message.photo[-1].file_id).file_path), temp_dict[message.from_user.id]["lang"])
+        
+        if texto_extraido[0].lower() == "error":
+            bot.send_message(message.chat.id, "ERROR:\n\n" + texto_extraido[1])
+            return
+        
+        else:
+            texto_extraido = texto_extraido[1]
+
+        # Preparar respuesta
+        respuesta = f"📝 <b>Texto reconocido:</b>\n\n<code>{texto_extraido}</code>"
+        
+        # Editar el mensaje de procesamiento con el resultado
+        bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=processing_msg.message_id,
+            text=respuesta,
+        )
+        
+        logging.info(f"OCR completado para usuario {message.from_user.id}")
+        
+    except Exception as e:
+        error_msg = f"❌ Error al procesar la imagen: {str(e)}"
+        bot.reply_to(message, error_msg)
+        logging.error(f"Error en handle_photo: {e}")
+
+
+
+@bot.message_handler(func=lambda x: True)
+def cmd_message(m):
+    traductor.ia.send_message(m.text.strip(), bot, m.chat.id)
+
+# Función para monitorear emails en segundo plano
+def email_monitor():
+    """
+    Monitorear emails en intervalos regulares
+    """
+    while True:
+        try:
+            traductor.procesar_emails()
+            time.sleep(30)  # Verificar cada 30 segundos
+        except Exception as e:
+            logging.error(f"Error en monitoreo de emails: {e}")
+            time.sleep(60)
+
+
+if __name__ == "__main__":
+    logging.info("Iniciando Bot de OCR...")
+    
+    # Iniciar monitoreo de emails en segundo plano
+    email_thread = threading.Thread(target=email_monitor, daemon=True)
+    email_thread.start()
+    
+    logging.info("Bot iniciado. Monitoreando Telegram y emails...")
+    logging.info(f"Email del bot: {EMAIL}")
+
+        
+
+
+app = Flask(__name__)
+
+@app.route("/", methods=['POST', 'GET'])
+def webhook():
+
+    
+    if request.method.lower() == "post":   
+        
+            
+        if request.headers.get('content-type') == 'application/json':
+            json_string = request.get_data().decode('utf-8')
+            update = telebot.types.Update.de_json(json_string)
+            try:
+                if "host" in update.message.text and update.message.chat.id == admin:
+                    bot.send_message(update.message.chat.id, "El url del host es: <code>{}</code>".format(request.url))
+                    
+                    #en los host gratuitos, cuando pasa un tiempo de inactividad el servicio muere, entonces hago este GET a la url para que no muera  
+                    if not list(filter(lambda i: i.name == "hilo_requests", threading.enumerate())):
+                        
+                        def hilo_requests():
+                            while True:
+                                requests.get(os.getenv("webhook_url"))
+                                time.sleep(60)
+                                
+
+                        threading.Thread(target=hilo_requests, name="hilo_requests").start()
+
+            except:
+                pass
+            
+            bot.process_new_updates([update])
+
+
+    else:
+        return "<a href='https://t.me/{}'>Contáctame</a>".format(bot.user.username)
+        
+    return "<a href='https://t.me/{}'>Contáctame</a>".format(bot.user.username)
+
+@app.route("/healthz")
+def check():
+    return "200 OK"
+
+
+def flask():
+    if os.getenv("webhook_url"):
+        bot.remove_webhook()
+        time.sleep(2)
+        bot.set_webhook(url=os.environ["webhook_url"])
+    
+    app.run(host="0.0.0.0", port=5000)
+
+
+try:
+    print("La dirección del servidor es:{}".format(request.host_url))
+    
+except:
+    hilo_flask=threading.Thread(name="hilo_flask", target=flask)
+    hilo_flask.start()
+    
+if not os.getenv("webhook_url"):
+    bot.remove_webhook()
+    time.sleep(2)
+    if os.environ.get("admin"):
+        bot.send_message(admin, "El bot de reconocimiento de texto está listo :)\n\nEstoy usando el método polling")
+    
+    try:
+        bot.infinity_polling(timeout=80,)
+    except Exception as e:
+        logging.error(f"Error en bot de Telegram: {e}")
