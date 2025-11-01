@@ -76,7 +76,6 @@ class arliaiAPI():
         # Gemma-3-27B-it
         # Gemma-3-27B-ArliAI-RPMax-v3
 
-        breakpoint()
         playload = json.dumps({
         "model": "Gemma-3-27B-it",
         "messages": 
