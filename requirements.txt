@@ -1,5 +1,7 @@
 beautifulsoup4==4.14.2
 DeeperSeek==0.1.4
+deltabot_cli==8.0.0
+deltachat2==0.8.0
 Flask==3.1.2
 inscriptis==2.6.0
 pyTelegramBotAPI==4.29.1
