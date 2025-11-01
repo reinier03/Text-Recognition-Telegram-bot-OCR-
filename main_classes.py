@@ -1,4 +1,3 @@
-from deeply import arliaiAPI
 from config import *
 import smtplib
 import imaplib
@@ -15,11 +14,15 @@ from DeeperSeek.internal.exceptions import *
 import re
 import requests
 import json
+import telebot
+from deltachat2 import MsgData, events
+from deltabot_cli import BotCli
+
 
 
 class OCR:
 
-    def get_text(self, file: str | bytes, language = "ja", remove_file = True):
+    def get_text(self, file: str | bytes, language = "ja", remove_file = False):
 
 
         payload = {'isOverlayRequired': False,
@@ -48,15 +51,92 @@ class OCR:
             return ("error", res.reason)
 
 
+class informacion_mensaje_correo:
+
+    def __init__(self, bot, event, accid):
+        self.accid = accid
+        self.bot = bot
+        self.event = event
+
+
+
+class arliaiAPI():
+
+    def __init__(self, api_token):
+        self.api_token = api_token
+        self.mensajes_de_contexto = [] #[{"role": "assistant", "content": texto}, {"role": "user", "content": texto}]
+
+
+    
+    def send_message(self, texto: str, clase_enviar = None, destinatario = None):
+        """
+        Envia el mensaje a la IA y devuelve la respuesta, si el parametro "clase_enviar" es dado se usará esa clase para enviar el mensaje directamente (solo se soporta la clase telebot.TeleBot o Email)
+        """
+        #models:
+        # Gemma-3-27B-it
+        # Gemma-3-27B-ArliAI-RPMax-v3
+
+        playload = json.dumps({
+        "model": "Gemma-3-27B-it",
+        "messages": 
+            [   
+                *self.mensajes_de_contexto,
+                {"role": "user", "content": texto},
+            ],
+            "temperature" : 0.5,
+            "max_completion_tokens": int((3900 - len(texto)) / 4) if isinstance(clase_enviar, telebot.TeleBot) else None
+        })
+
+        headers={"Content-Type": "application/json",
+                "Authorization": "Bearer {}".format(self.api_token)}
+
+        res = requests.post("https://api.arliai.com/v1/chat/completions", playload, headers=headers)
+
+        if clase_enviar and destinatario:
+            if isinstance(clase_enviar, telebot.TeleBot):
+                if res.status_code == 200:
+                    clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")[:4000], parse_mode='Markdown')
+
+                else:
+                    clase_enviar.send_message(destinatario, "Ha Ocurrido un Error :(\n\nDescripción del error:\n" + res.reason)
+
+            elif isinstance(clase_enviar, informacion_mensaje_correo):
+
+                if res.status_code == 200:
+
+                    clase_enviar.bot.rpc.send_msg(clase_enviar.accid, clase_enviar.event.msg.chat_id , MsgData(text=res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")))
+
+                else:
+                    
+                    clase_enviar.bot.rpc.send_msg(clase_enviar.accid, clase_enviar.event.msg.chat_id , MsgData(text="Descripción del error:\n" + res.json()))
+                    
+
+            return ("ok", "texto_enviado")
+        
+        else:
+
+            if res.status_code == 200:
+                return ("ok", res.json()["choices"][0]["message"]["content"].replace("*", "").replace("!", "!"))
+            
+            else:
+                return ("error", res.reason)
+        
+
+    def definir_contexto(self, texto):
+        self.mensajes_de_contexto.append({{"role": "user", "content": texto}})
+
 
 class main_class:  
 
-    def __init__(self, bot):
+    def __init__(self, bot = False, correo_only=False):
         self.processed_emails = set()
-        self.bot = bot 
         self.intentos_red = 7
         self.ia = arliaiAPI(arliai_token)
         self.ocr = OCR()
+        self.email = BotCli("Email Bot")
+
+        if not correo_only:
+            self.bot = bot
 
 
 
