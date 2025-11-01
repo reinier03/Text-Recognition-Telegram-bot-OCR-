@@ -22,7 +22,7 @@ from deltabot_cli import BotCli
 
 class OCR:
 
-    def get_text(self, file: str | bytes, language = "ja", remove_file = False):
+    def get_text(self, file: str | bytes, language = "auto", remove_file = False):
 
 
         payload = {'isOverlayRequired': False,

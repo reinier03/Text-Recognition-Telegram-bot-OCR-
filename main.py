@@ -68,7 +68,8 @@ def handle_photo(message: telebot.types.Message):
 
         if message.caption:
             if re.search(r"/texto\s+([^/]*?)(?=\s*/|$)", message.caption.lower()):
-                temp_dict[message.from_user.id]["lang"] = re.search(r"/texto \w+", message.caption.lower()).group().replace("/texto", "").strip()
+                if  re.search(r"/texto \w+", message.caption.lower()).group().replace("/texto", "").strip() in ["eng", "jpn", "spa"]:
+                    temp_dict[message.from_user.id]["lang"] = re.search(r"/texto \w+", message.caption.lower()).group().replace("/texto", "").strip()
 
         # Procesar la imagen
         texto_extraido = traductor.ocr.get_text(bot.download_file(bot.get_file(message.photo[-1].file_id).file_path), temp_dict[message.from_user.id]["lang"])
