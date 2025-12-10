@@ -2,12 +2,15 @@ import os
 from config import *
 from main_classes import *
 import telebot
+from telebot.types import *
 import threading
 import time
 import os
 import logging
 from flask import Flask, request
 import requests
+
+admin_dict = {"ia" : False}
 
 
 
@@ -26,6 +29,14 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="html", disable_web_page_pr
 
 traductor = main_class(bot)
 
+
+bot.set_my_commands(
+    [
+        BotCommand("/start", "Ayuda sobre el bot"),
+        BotCommand("/contexto", "Le da contexto a la IA"),
+        BotCommand("/panel", "SOLO admin")
+    ]
+)
 
 @bot.message_handler(commands=["contexto"])
 def set_contexto(m):
@@ -118,8 +129,37 @@ def handle_photo(message: telebot.types.Message):
         logging.error(f"Error en handle_photo: {e}")
 
 
+@bot.message_handler(commands=["panel"], func=lambda m: m.from_user.id == int(os.environ["admin"]))
+def panel(m):
+    bot.send_message(m.chat.id, "Hola, que pretendes hacer?", reply_markup=InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("Activar IA", callback_data="p/ia") if not admin_dict["ia"] else InlineKeyboardButton("Desactivar IA", callback_data="p/ia")]
+        ]
+            
+        ))
 
-@bot.message_handler(func=lambda x: True)
+
+@bot.callback_query_handler(func=lambda x: True)
+def cmd_callback_handler(c : CallbackQuery):
+
+    try:
+        bot.delete_message(c.message.chat.id, c.message.message_id)
+    except:
+        pass
+
+    if c.data.startswith("p/ia"):
+        if not admin_dict["ia"]:
+            admin_dict["ia"] = True
+            bot.send_message(c.message.chat.id, "Los mensajes de la IA han sido activados")
+
+        else:
+            admin_dict["ia"] = False
+            bot.send_message(c.message.chat.id, "Los mensajes de la IA han sido desactivados")
+
+
+    return
+
+@bot.message_handler(func=lambda x: True and admin_dict["ia"])
 def cmd_message(m):
     traductor.ia.send_message(m.text.strip(), bot, m.chat.id)
 
