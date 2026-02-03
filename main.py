@@ -139,6 +139,25 @@ def panel(m):
         ))
 
 
+@bot.message_handler(func=lambda m: True if re.search(r"^(kanji:)", m.text) else False)
+def buscar_kanji(m):
+    res = requests.get("https://kanjiapi.dev/v1/kanji/" + re.search(r"^(kanji:.*)", m.text).group().strip().split("kanji:")[-1].strip())
+
+    if res.status_code == 200:
+        bot.send_message(f"""
+Kanji {res["kanji"]}
+
+🗣Lectura(s) kun:
+{"\n".join(["👉" + lecturas for lecturas in res["kun_readings"]])}
+
+📖Significado(s) [en]:
+{"\n".join(["👉" + significados for significados in res["meanings"]])}
+""".strip())
+    else:
+        bot.reply_to(m , "Ese kanji no existe o has ingresado los datos inválidos")
+
+    
+
 @bot.callback_query_handler(func=lambda x: True)
 def cmd_callback_handler(c : CallbackQuery):
 
