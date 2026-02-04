@@ -138,21 +138,23 @@ def panel(m):
             
         ))
 
-
-@bot.message_handler(func=lambda m: True if re.search(r"^(kanji:)", m.text) else False)
+#------------------Para investigar acerca de kanjis
+@bot.message_handler(func=lambda m: True if re.search(r"^(k:)", m.text.lower()) else False)
 def buscar_kanji(m):
-    res = requests.get("https://kanjiapi.dev/v1/kanji/" + re.search(r"^(kanji:.*)", m.text).group().strip().split("kanji:")[-1].strip())
+    m.text = m.text.lower()
+    res = requests.get("https://kanjiapi.dev/v1/kanji/" + re.search(r"^(k:.*)", m.text).group().strip().split("k:")[-1].strip())
 
     if res.status_code == 200:
-        bot.send_message(f"""
+        res = json.loads(res.content)
+        bot.send_message(m.chat.id, f"""
 Kanji {res["kanji"]}
 
-🗣Lectura(s) kun:
-{"\n".join(["👉" + lecturas for lecturas in res["kun_readings"]])}
+🗣Lectura(s) kun: 
+<blockquote expandable>{"\n".join([lecturas for lecturas in res["kun_readings"]])}</blockquote>
 
 📖Significado(s) [en]:
-{"\n".join(["👉" + significados for significados in res["meanings"]])}
-""".strip())
+<blockquote expandable>{"\n".join([ significados for significados in res["meanings"]])}</blockquote>
+""")
     else:
         bot.reply_to(m , "Ese kanji no existe o has ingresado los datos inválidos")
 
