@@ -1,4 +1,6 @@
 import os
+
+import telebot.types
 from config import *
 from main_classes import *
 import telebot
@@ -11,6 +13,7 @@ from flask import Flask, request
 import requests
 
 admin_dict = {"ia" : False}
+historial_borrar = {} #diccionario que almacenará el historial de deteccion de OCR, almacenará el ID de los mensajes para luego borrarlos y limpiar el chat
 
 
 
@@ -84,9 +87,13 @@ Envía un email a {} con:
     bot.reply_to(message, welcome_text, parse_mode='Markdown')
 
 
-
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message: telebot.types.Message):
+
+    if not historial_borrar.get(message.from_user.id):
+        historial_borrar[message.from_user.id] = []
+
+    historial_borrar[message.from_user.id].append(message.message_id)
 
     try:
         # Informar que se está procesando
@@ -115,11 +122,14 @@ def handle_photo(message: telebot.types.Message):
         respuesta = f"📝 <b>Texto reconocido:</b>\n\n<code>{texto_extraido}</code>"
         
         # Editar el mensaje de procesamiento con el resultado
-        bot.edit_message_text(
+        msg = bot.edit_message_text(
             chat_id=message.chat.id,
             message_id=processing_msg.message_id,
             text=respuesta,
+            reply_markup=InlineKeyboardButton("Limpiar Chat", callback_data="clear_" + str(message.from_user.id))
         )
+
+        historial_borrar[message.from_user.id].append(msg.message_id)
         
         logging.info(f"OCR completado para usuario {message.from_user.id}")
         
@@ -127,6 +137,12 @@ def handle_photo(message: telebot.types.Message):
         error_msg = f"❌ Error al procesar la imagen: {str(e)}"
         bot.reply_to(message, error_msg)
         logging.error(f"Error en handle_photo: {e}")
+
+#para limpiar el chat de los OCRs
+@bot.callback_query_handler(func=lambda c: c.data.startswith("clear_"))
+def limpiar_chat(c: telebot.types.CallbackQuery):
+    for id_mensaje in historial_borrar[int(re.search(r"\d+", c.data).group())]:
+        bot.delete_message(c.message.chat.id, id_mensaje)
 
 
 @bot.message_handler(commands=["panel"], func=lambda m: m.from_user.id == int(os.environ["admin"]))
@@ -142,6 +158,7 @@ def panel(m):
 @bot.message_handler(func=lambda m: True if re.search(r"^(k:)", m.text.lower()) else False)
 def buscar_kanji(m):
     m.text = m.text.lower()
+    m.text = m.text.replace(" ", "")
     res = requests.get("https://kanjiapi.dev/v1/kanji/" + re.search(r"^(k:.*)", m.text).group().strip().split("k:")[-1].strip())
 
     if res.status_code == 200:
@@ -159,7 +176,6 @@ Kanji {res["kanji"]}
         bot.reply_to(m , "Ese kanji no existe o has ingresado los datos inválidos")
 
     
-
 @bot.callback_query_handler(func=lambda x: True)
 def cmd_callback_handler(c : CallbackQuery):
 
