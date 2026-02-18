@@ -143,6 +143,8 @@ def handle_photo(message: telebot.types.Message):
 def limpiar_chat(c: telebot.types.CallbackQuery):
     for id_mensaje in historial_borrar[int(re.search(r"\d+", c.data).group())]:
         bot.delete_message(c.message.chat.id, id_mensaje)
+    
+    historial_borrar[int(re.search(r"\d+", c.data).group())].clear()
 
 
 @bot.message_handler(commands=["panel"], func=lambda m: m.from_user.id == int(os.environ["admin"]))
