@@ -126,7 +126,7 @@ def handle_photo(message: telebot.types.Message):
             chat_id=message.chat.id,
             message_id=processing_msg.message_id,
             text=respuesta,
-            reply_markup=InlineKeyboardButton("Limpiar Chat", callback_data="clear_" + str(message.from_user.id))
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Limpiar Chat", callback_data="clear_" + str(message.from_user.id))]])
         )
 
         historial_borrar[message.from_user.id].append(msg.message_id)
