@@ -129,15 +129,14 @@ def handle_photo(message: telebot.types.Message):
             text=respuesta,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Limpiar Chat", callback_data="clear_" + str(message.from_user.id))]])
         )
-
-        historial_borrar[message.from_user.id].append(msg.message_id)
         
         logging.info(f"OCR completado para usuario {message.from_user.id}")
         
     except Exception as e:
-        error_msg = f"❌ Error al procesar la imagen: {str(e)}"
-        bot.reply_to(message, error_msg)
+        msg = bot.reply_to(message, f"❌ Error al procesar la imagen: {str(e)}")
         logging.error(f"Error en handle_photo: {e}")
+
+    historial_borrar[message.from_user.id].append(msg.message_id)
 
 #para limpiar el chat de los OCRs
 @bot.callback_query_handler(func=lambda c: c.data.startswith("clear_"))
@@ -168,19 +167,25 @@ def buscar_kanji(m):
     m.text = m.text.replace(" ", "")
     res = requests.get("https://kanjiapi.dev/v1/kanji/" + re.search(r"^(k:.*)", m.text).group().strip().split("k:")[-1].strip())
 
+    #Agregar al historial de cosas por borrar
+    if not historial_borrar.get(m.from_user.id):
+        historial_borrar[m.from_user.id] = []
+
     if res.status_code == 200:
         res = json.loads(res.content)
-        bot.send_message(m.chat.id, f"""
+        m = bot.send_message(m.chat.id, f"""
 Kanji {res["kanji"]}
 
 🗣Lectura(s) kun: 
-<blockquote expandable>{"\n".join([lecturas for lecturas in res["kun_readings"]])}</blockquote>
+<blockquote>{"\n".join([lecturas for lecturas in res["kun_readings"]])}</blockquote>
 
 📖Significado(s) [en]:
-<blockquote expandable>{"\n".join([ significados for significados in res["meanings"]])}</blockquote>
+<blockquote>{"\n".join([ significados for significados in res["meanings"]])}</blockquote>
 """)
     else:
         bot.reply_to(m , "Ese kanji no existe o has ingresado los datos inválidos")
+
+    historial_borrar[m.from_user.id].append(m.message_id)
 
     
 @bot.callback_query_handler(func=lambda x: True)
