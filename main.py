@@ -1,6 +1,7 @@
 import os
 
 import telebot.types
+import telebot.types
 from config import *
 from main_classes import *
 import telebot
@@ -142,7 +143,11 @@ def handle_photo(message: telebot.types.Message):
 @bot.callback_query_handler(func=lambda c: c.data.startswith("clear_"))
 def limpiar_chat(c: telebot.types.CallbackQuery):
     for id_mensaje in historial_borrar[int(re.search(r"\d+", c.data).group())]:
-        bot.delete_message(c.message.chat.id, id_mensaje)
+        try:
+            bot.delete_message(c.message.chat.id, id_mensaje)
+
+        except:
+            pass
     
     historial_borrar[int(re.search(r"\d+", c.data).group())].clear()
 
