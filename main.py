@@ -13,7 +13,7 @@ import logging
 from flask import Flask, request
 import requests
 
-admin_dict = {"ia" : False}
+
 historial_borrar = {} #diccionario que almacenará el historial de deteccion de OCR, almacenará el ID de los mensajes para luego borrarlos y limpiar el chat
 
 
@@ -29,7 +29,8 @@ logging.basicConfig(
 )
 
 # Inicializar bot de Telegram
-bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="html", disable_web_page_preview=True)
+telebot.apihelper.ENABLE_MIDDLEWARE = True
+bot = TelegramBot(TELEGRAM_BOT_TOKEN, parse_mode="html", disable_web_page_preview=True)
 
 traductor = main_class(bot)
 
@@ -37,26 +38,14 @@ traductor = main_class(bot)
 bot.set_my_commands(
     [
         BotCommand("/start", "Ayuda sobre el bot"),
-        BotCommand("/contexto", "Le da contexto a la IA"),
+        BotCommand("/historial", "Administrar tu historial de chat con la IA"),
         BotCommand("/panel", "SOLO admin")
     ]
 )
 
-@bot.message_handler(commands=["contexto"])
-def set_contexto(m):
-    msg = bot.send_message(m.chat.id, "Ahora envía el nuevo mensaje de contexto para la IA", reply_markup=telebot.types.ReplyKeyboardMarkup(True, True).add("Eliminar Contexto / Cancelar Operación"))
-
-    bot.register_next_step_handler(msg, get_contexto)
-
-
-def get_contexto(m):
-    if m.text == "Eliminar Contexto / Cancelar Operación":
-        traductor.ia.mensajes_de_contexto.clear()
-        bot.send_message(m.chat.id, "Muy bien, el mensaje de contexto ha sido eliminado y la operación ha sido cancelada", reply_markup=telebot.types.ReplyKeyboardRemove())
-        return
-
-    traductor.ia.mensajes_de_contexto = [{"role": "user", "content": m.text}]
-    bot.send_message(m.chat.id, "Muy bien, a partir de ahora el mensaje de contexto es:\n\n" + m.text, reply_markup=telebot.types.ReplyKeyboardRemove())
+# @bot.middleware_handler()
+# def middleware(bot, update):
+#     pass
 
 
 # Handlers de Telegram
@@ -86,6 +75,35 @@ Envía un email a {} con:
     """.format(EMAIL)
     
     bot.reply_to(message, welcome_text, parse_mode='Markdown')
+
+
+@bot.message_handler(commands=["historial"])
+def historial(m: telebot.types.Message):
+    if not traductor.ia:
+        bot.send_message(m.chat.id, "Ahora mismo no hay ninguna IA activada de la cual trabajar el historial")
+        return 
+
+    bot.send_message(m.chat.id, f"Aquí puedes administrar tu historial de conversacion con {traductor.ia.ia_nombre}",reply_markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton("Mostrar historial", callback_data="h/mostrar")],
+        [InlineKeyboardButton("Limpiar historial", callback_data="h/limpiar")],
+    ]))
+
+@bot.callback_query_handler(func=lambda c: c.data == "h/limpiar")
+def historial_limpiar(c):
+    global traductor
+
+    traductor.ia.mensajes_de_contexto.clear()
+    bot.send_message(c.message.chat.id, "Historial de mensajes de IA limpio")
+
+@bot.callback_query_handler(func=lambda c: c.data == "h/mostrar")
+def historial_mostrar(c):
+    global traductor
+
+    if traductor.ia.mensajes_de_contexto:
+        bot.send_message(c.message.chat.id, "\n\n--------------------------------\n\n".join(diccionario_valores["content"] for diccionario_valores in traductor.ia.mensajes_de_contexto))
+
+    else:
+        bot.send_message(c.message.chat.id, "El chat está vacío")
 
 
 @bot.message_handler(content_types=['photo'])
@@ -151,14 +169,24 @@ def limpiar_chat(c: telebot.types.CallbackQuery):
     historial_borrar[int(re.search(r"\d+", c.data).group())].clear()
 
 
-@bot.message_handler(commands=["panel"], func=lambda m: m.from_user.id == int(os.environ["admin"]))
+
+# @bot.message_handler(commands=["panel"], func=lambda m: m.from_user.id == int(os.environ["admin"]))
+@bot.message_handler(commands=["panel"])
 def panel(m):
-    bot.send_message(m.chat.id, "Hola, que pretendes hacer?", reply_markup=InlineKeyboardMarkup(
+
+    markup = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("Activar IA", callback_data="p/ia") if not admin_dict["ia"] else InlineKeyboardButton("Desactivar IA", callback_data="p/ia")]
+            [InlineKeyboardButton("Activar IA", callback_data="p/ia") if not traductor.ia else InlineKeyboardButton("Desactivar IA", callback_data="p/ia")]
         ]
-            
-        ))
+    )
+
+    if traductor.ia:
+        markup.row(InlineKeyboardButton("Cambiar IA", callback_data="p/cambiar_ia")) 
+    
+    # if traductor.ia and traductor.ia.mensajes_de_contexto:
+    #     markup.row(InlineKeyboardButton("Ver contexto completo", callback_data="p/context"))
+
+    bot.send_message(m.chat.id, "Hola, que pretendes hacer?", reply_markup=markup)
 
 #------------------Para investigar acerca de kanjis
 @bot.message_handler(func=lambda m: True if re.search(r"^(k:)", m.text.lower()) else False)
@@ -190,27 +218,39 @@ Kanji {res["kanji"]}
     
 @bot.callback_query_handler(func=lambda x: True)
 def cmd_callback_handler(c : CallbackQuery):
-
     try:
         bot.delete_message(c.message.chat.id, c.message.message_id)
     except:
         pass
 
-    if c.data.startswith("p/ia"):
-        if not admin_dict["ia"]:
-            admin_dict["ia"] = True
+    if c.data == "p/ia":
+        if not traductor.ia:
+            traductor.ia = "openrouter"
             bot.send_message(c.message.chat.id, "Los mensajes de la IA han sido activados")
 
         else:
-            admin_dict["ia"] = False
+            traductor.ia = False
             bot.send_message(c.message.chat.id, "Los mensajes de la IA han sido desactivados")
 
+    elif c.data.startswith("p/ia/c/"):
+        traductor.ia = c.data.split("c/")[-1]
+        bot.send_message(c.message.chat.id, "La IA de " + traductor.ia.ia_nombre + " ha sido seleccionada")
+        return
+
+    elif c.data == "p/cambiar_ia":
+        bot.send_message(c.message.chat.id, "Cuál IA deseas?", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(ia, callback_data="p/ia/c/" + ia)] for ia in traductor._ia_disponibles]))
 
     return
 
-@bot.message_handler(func=lambda x: True and admin_dict["ia"])
+@bot.message_handler(func=lambda x: True and traductor.ia)
 def cmd_message(m):
-    traductor.ia.send_message(m.text.strip(), bot, m.chat.id)
+    global traductor
+
+    res = traductor.ia.send_message(m.text.strip(), bot, m.chat.id)
+
+    if res:
+        traductor.ia.agregar_contexto(m.text.strip())
+        traductor.ia.agregar_contexto(res)
 
 # Función para monitorear emails en segundo plano
 def email_monitor():

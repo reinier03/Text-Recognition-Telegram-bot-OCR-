@@ -13,6 +13,7 @@ admin = int(os.environ["admin"]) if os.environ.get("admin") else 1413725506
 
 #https://www.arliai.com/ 
 arliai_token = os.environ["arliai_token"] if os.environ.get("arliai_token") else None
+openrouter_token = os.environ["openrouter"] if os.environ.get("openrouter") else None
 
 # https://ocr.space/
 ocr_token = os.environ["ocr_token"] if os.environ.get("ocr_token") else None

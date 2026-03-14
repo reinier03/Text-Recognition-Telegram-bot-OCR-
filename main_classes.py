@@ -17,7 +17,59 @@ import json
 import telebot
 from deltachat2 import MsgData, events
 from deltabot_cli import BotCli
+from typing import *
 
+
+class TelegramBot(telebot.TeleBot):
+    def __init__(self, token, parse_mode, disable_web_page_preview):
+        super().__init__(token, parse_mode, disable_web_page_preview)
+
+    def get_chat(self, chat_id):
+        try:
+            return super().get_chat(chat_id)
+        except telebot.apihelper.ApiTelegramException:
+            return None
+
+
+    def send_message(self, chat_id, text, parse_mode = None, entities = None, disable_web_page_preview = None, disable_notification = None, protect_content = None, reply_to_message_id = None, allow_sending_without_reply = None, reply_markup = None, timeout = None, message_thread_id = None, reply_parameters = None, link_preview_options = None, business_connection_id = None, message_effect_id = None, msg_type: Literal["inf", "req", "err"]=None):
+
+        if re.search("ERROR", text):
+            msg_type = "err"
+
+        if msg_type:
+            match msg_type:
+                case "inf":
+                    text = "❗ <u><b>Solicitud de Información</b></u> ❗\n\n" + text
+
+                case "req":
+                    text = "🆕 <u><b>Mensaje de Información</b></u>\n\n" + text
+
+                case "err":
+                    text = "<b>❌ ¡Error! ❌</b>\n¡La información ingresada es incorrecta!\n\n" + text
+
+        if len(text) >= 4000:
+
+            for i in range(len(text) // 4000 + 1):
+
+                if i == (len(text) // 4000 + 1) - 1:
+                    return super().send_message(chat_id, text[i * 4000 : (i + 1) * 4000], parse_mode, entities, disable_web_page_preview, disable_notification, protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup, timeout, message_thread_id, reply_parameters, link_preview_options, business_connection_id, message_effect_id)
+
+        
+                super().send_message(chat_id, text[i * 4000 : (i + 1) * 4000], parse_mode, entities, disable_web_page_preview, disable_notification, protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup, timeout, message_thread_id, reply_parameters, link_preview_options, business_connection_id, message_effect_id)
+
+            
+
+        else:
+            
+            return super().send_message(chat_id, text, parse_mode, entities, disable_web_page_preview, disable_notification, protect_content, reply_to_message_id, allow_sending_without_reply, reply_markup, timeout, message_thread_id, reply_parameters, link_preview_options, business_connection_id, message_effect_id)
+
+
+    def delete_message(self, chat_id, message_id, timeout = None):
+        try:
+            return super().delete_message(chat_id, message_id, timeout)
+
+        except:
+            return False
 
 
 class OCR:
@@ -59,12 +111,91 @@ class informacion_mensaje_correo:
         self.event = event
 
 
+class IA_interfaz():
 
-class arliaiAPI():
+    api_token = None
+
+    def __init__(self, api_token):
+
+        self.api_token = api_token
+        self.mensajes_de_contexto = []
+        self.ia_nombre = ""
+
+
+    def send_message(self, texto, clase_enviar = None, destinatario: int = None):
+        """
+        Envia el mensaje a la IA y devuelve la respuesta, si el parametro "clase_enviar" es dado se usará esa clase para enviar el mensaje directamente (solo se soporta la clase telebot.TeleBot o Email)
+        """
+        return None
+    
+
+    def agregar_contexto(self, texto_contexto):
+        if isinstance(texto_contexto, dict):
+            if texto_contexto["role"] == "user":
+                self.mensajes_de_contexto.append({"role": "user", "content": texto_contexto["content"]})
+
+            elif texto_contexto["role"] == "assistant":
+                self.mensajes_de_contexto.append({"role": "assistant", "content": texto_contexto["content"]})
+
+
+        else:
+            self.mensajes_de_contexto.append({"role": "user", "content": texto_contexto})
+
+
+        return
+
+
+class openrouter(IA_interfaz):
+
+    def __init__(self, api_token):
+        super().__init__(api_token)
+        self.ia_nombre = "openrouter"
+
+
+    def send_message(self, texto : str, clase_enviar : telebot.TeleBot = None, destinatario:int=None):
+        
+        
+        res = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": "Bearer " + openrouter_token},
+            data=json.dumps({
+                "model": "arcee-ai/trinity-large-preview:free", # Optional
+                "messages": [
+                    *self.mensajes_de_contexto,
+                    {
+                        "role": "user",
+                        "content": texto
+                    }
+                ]
+            })
+        )
+
+        if res.status_code == 200:
+
+            if not clase_enviar and not destinatario and not isinstance(clase_enviar, telebot.TeleBot):
+                return res.json()["choices"][0]["message"]
+
+            clase_enviar.send_message(destinatario, res.json()["choices"][-1]["message"]["content"], "markdown")
+
+            return res.json()["choices"][0]["message"]
+
+        else:
+            if clase_enviar and destinatario and isinstance(clase_enviar, telebot.TeleBot):
+                clase_enviar.send_message(destinatario, "ERROR:\n"+ res.json())
+            
+
+            return False
+
+        
+
+
+class arliaiAPI(IA_interfaz):
 
     def __init__(self, api_token):
         self.api_token = api_token
         self.mensajes_de_contexto = [] #[{"role": "assistant", "content": texto}, {"role": "user", "content": texto}]
+        self.ia_nombre = "arliai"
 
 
     
@@ -96,13 +227,17 @@ class arliaiAPI():
             if isinstance(clase_enviar, telebot.TeleBot):
                 if res.status_code == 200:
                     try:
-                        clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")[:4000], parse_mode='Markdown')
+                        clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!"), parse_mode='MarkdownV2')
 
                     except:
-                        clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!")[:4000], parse_mode=False)
+                        clase_enviar.send_message(destinatario, res.json()["choices"][0]["message"]["content"].replace("**", "*").replace("!", "!"), parse_mode=False)
+
+                        return res.json()["choices"][0]["message"]
 
                 else:
                     clase_enviar.send_message(destinatario, "Ha Ocurrido un Error :(\n\nDescripción del error:\n" + res.reason)
+
+                    return False
 
             elif isinstance(clase_enviar, informacion_mensaje_correo):
 
@@ -127,7 +262,7 @@ class arliaiAPI():
         
 
     def definir_contexto(self, texto):
-        self.mensajes_de_contexto.append({{"role": "user", "content": texto}})
+        self.mensajes_de_contexto.append({"role": "user", "content": texto})
 
 
 class main_class:  
@@ -135,12 +270,34 @@ class main_class:
     def __init__(self, bot = False, correo_only=False):
         self.processed_emails = set()
         self.intentos_red = 7
-        self.ia = arliaiAPI(arliai_token)
+        self.arlai = arliaiAPI(arliai_token)
+        self.openrouter = openrouter(openrouter_token)
         self.ocr = OCR()
         self.email = BotCli("Email Bot")
+        self._ia_disponibles = ["openrouter", "arlai"]
+        self._ia_elegida = False #ariai | openrouter
 
         if not correo_only:
             self.bot = bot
+
+    @property
+    def ia(self):
+        return self._ia_elegida
+    
+
+    @ia.getter
+    def ia(self):
+        return self._ia_elegida
+    
+
+    @ia.setter
+    def ia(self, modelo_disponible: Literal["openrouter", "arlai"]):
+        
+        if modelo_disponible == "arlai":
+            self._ia_elegida = self.arlai
+
+        if modelo_disponible == "openrouter":
+            self._ia_elegida = self.openrouter
 
 
 
